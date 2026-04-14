@@ -1,0 +1,37 @@
+**Overview**
+An Arduino-based circuit that reads temperature via an NTC thermistor and automatically controls power delivery to a resistive load using a MOSFET and PWM signal.
+
+---
+
+**Components**
+- **Arduino Uno** — the brain; reads temperature and outputs PWM
+- **Thermistor (NTC 10kΩ)** — senses temperature; resistance drops as it gets hotter
+- **Resistor 10kΩ** — pairs with the thermistor to form a voltage divider in the sensing loop
+- **Resistor 220Ω (Gate)** — limits current into the MOSFET gate to prevent ringing
+- **MOSFET IRLZ44N** — logic-level N-channel switch that controls the power load
+- **Power Resistor (Load)** — the thing being throttled (simulates a fan, heater, etc.)
+- **External PSU 12V DC** — powers the load through the MOSFET
+
+---
+
+**How It Works**
+
+The circuit has three loops working together.
+
+The sensing loop runs on the +5V rail. The thermistor and the 10kΩ resistor form a voltage divider. As temperature rises, the thermistor's resistance drops, which pulls the midpoint voltage lower. The Arduino reads this changing voltage on its analog pin (A0) to figure out the current temperature.
+
+The Arduino then maps that analog reading to a PWM duty cycle on one of its PWM pins. This signal passes through the 220Ω gate resistor into the MOSFET gate, controlling how much the MOSFET conducts.
+
+The power loop runs on the 12V external PSU. Current flows from the PSU through the power resistor (load), into the MOSFET drain, and out the source to GND. The MOSFET sits on the low side, acting as a variable switch — the PWM signal determines how much average power the load receives.
+
+The GND of the Arduino and the GND of the 12V PSU must be tied together (common ground) for the gate signal to work correctly.
+
+---
+
+**Signal Flow**
+Temperature rises → thermistor resistance drops → A0 voltage drops → Arduino increases PWM duty cycle → MOSFET conducts more → load receives more power.
+
+---
+
+**Key Design Choices**
+The IRLZ44N is a logic-level MOSFET, meaning it turns on fully with just 5V on the gate — no separate gate driver needed. It's placed on the low side (between load and GND), which is the standard and safe configuration when driving from a microcontroller. For a pure resistive load like here, no flyback diode is needed, but one should be added if the load is ever swapped for something inductive like a motor or relay.
