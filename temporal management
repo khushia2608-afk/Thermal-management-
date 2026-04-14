@@ -1,0 +1,60 @@
+
+
+// Pins
+const int sensorPin = A0;   // Thermistor Divider Input
+const int mosfetPin = 9;    // PWM Output to MOSFET
+
+// Thresholds
+const float thresholdHigh = 40.0; // Point where power cuts off
+const float thresholdLow = 32.0;  // Point where power is allowed to resume
+bool systemThrottled = false;     // State variable to track "Cooling Mode"
+
+void setup() {
+  pinMode(mosfetPin, OUTPUT);
+  Serial.begin(9600);
+  Serial.println("--- SMART THERMAL MONITOR INITIALIZED ---");
+}
+
+void loop() {
+  // 1. Read and Calculate Temperature
+  int rawValue = analogRead(sensorPin);
+  
+  // Standard 10k NTC Thermistor Math (Steinhart-Hart Equation approximation)
+  float voltage = rawValue * (5.0 / 1023.0);
+  float resistance = (5.0 * 10000.0 / voltage) - 10000.0;
+  
+  // Note: 3950 is the 'Beta' of most standard thermistors
+  float tempC = 1 / (log(resistance / 10000.0) / 3950.0 + 1 / 298.15) - 273.15;
+
+  // 2. Hysteresis Logic
+  if (tempC >= thresholdHigh) {
+    systemThrottled = true; // High heat detected! Lock the power OFF
+  } 
+  
+  if (tempC <= thresholdLow) {
+    systemThrottled = false; // System has cooled down. Allow power.
+  }
+
+  // 3. Set Power Level
+  int powerLevel;
+  if (systemThrottled) {
+    powerLevel = 0;   // Force 0% power during cooling phase
+  } else {
+    powerLevel = 255; // Run at 100% power during normal phase
+  }
+
+  analogWrite(mosfetPin, powerLevel);
+
+  // 4. Visual Output for Judges
+  Serial.print("Temp: ");
+  Serial.print(tempC);
+  Serial.print(" C | Status: ");
+  
+  if (systemThrottled) {
+    Serial.println("[ COOLING DOWN - POWER OFF ]");
+  } else {
+    Serial.println("[ SYSTEM NORMAL - POWER ON ]");
+  }
+
+  delay(500); // Check every half-second
+}
