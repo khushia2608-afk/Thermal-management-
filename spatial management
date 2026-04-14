@@ -1,0 +1,66 @@
+
+
+// Pins
+const int sensorPin = A0;   // Thermistor Divider Input
+const int mosfetPin = 9;    // PWM Output to MOSFET
+
+// Thresholds
+const float thresholdHigh = 37.0; // Point where power cuts off
+const float thresholdLow = 32.0;  // Point where power is allowed to resume
+bool systemThrottled = false;     // State variable to track "Cooling Mode"
+
+void setup() {
+  pinMode(mosfetPin, OUTPUT);
+  Serial.begin(9600);
+  // Note: Removed intro text as it can glitch the plotter scaling initially
+}
+
+void loop() {
+  // 1. Read and Calculate Temperature
+  int rawValue = analogRead(sensorPin);
+  
+  // Standard 10k NTC Thermistor Math
+  float voltage = rawValue * (5.0 / 1023.0);
+  float resistance = (5.0 * 10000.0 / voltage) - 10000.0;
+  float tempC = 1 / (log(resistance / 10000.0) / 3950.0 + 1 / 298.15) - 273.15;
+
+  // 2. Hysteresis Logic
+  if (tempC >= thresholdHigh) {
+    systemThrottled = true; 
+  } 
+  
+  if (tempC <= thresholdLow) {
+    systemThrottled = false; 
+  }
+
+  // 3. Set Power Level
+  int powerLevel;
+  if (systemThrottled) {
+    powerLevel = 0;   
+  } else {
+    powerLevel = 255; 
+  }
+
+  analogWrite(mosfetPin, powerLevel);
+
+  // 4. Plotter Output
+  // Formatting: Label:Value, Label:Value
+  // This allows the plotter to create a legend automatically
+  Serial.print("Temperature_C:");
+  Serial.print(tempC);
+  Serial.print(",");
+  
+  Serial.print("Upper_Limit:");
+  Serial.print(thresholdHigh);
+  Serial.print(",");
+  
+  Serial.print("Lower_Limit:");
+  Serial.print(thresholdLow);
+  Serial.print(",");
+  
+  // Map power to a smaller scale (0-40) so it doesn't squash the temp graph
+  Serial.print("Power_Status:");
+  Serial.println(systemThrottled ? 0 : 40); 
+
+  delay(100); // Slightly faster sampling for a smoother graph
+}
